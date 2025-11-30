@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - Biz Insight AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .report-list {
+            margin-top: 2rem;
+        }
+
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .report-item:last-child {
+            border-bottom: none;
+        }
+
+        .report-info h4 {
+            margin-bottom: 0.25rem;
+        }
+
+        .report-date {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center;">
+            <h2 style="color: var(--primary-color);">Biz Insight AI</h2>
+            <nav class="nav-links">
+                <a href="/dashboard.html">Dashboard</a>
+                <a href="/upload.html">Upload Data</a>
+                <a href="/reports.html" style="color: var(--primary-color);">Reports</a>
+            </nav>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <span id="user-email" style="margin-right: 1rem; font-size: 0.875rem;"></span>
+            <button onclick="App.logout()" class="btn" style="border: 1px solid var(--border-color);">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h3>AI Reports</h3>
+                <select id="store-select" class="form-input" style="width: auto;" onchange="loadReports()">
+                    <option value="">Loading stores...</option>
+                </select>
+            </div>
+
+            <div
+                style="background: #374151; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid var(--border-color);">
+                <h4 style="margin-bottom: 1rem;">Generate New Report</h4>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Generate an AI-powered analysis for the last 7 days.
+                </p>
+                <button onclick="generateReport()" class="btn btn-primary" id="generate-btn">
+                    Generate Report (Last 7 Days)
+                </button>
+                <div id="generate-status" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+            </div>
+
+            <h4>Report History</h4>
+            <div id="report-list" class="report-list">
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    Select a store to view reports
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadStores();
+        });
+
+        async function loadStores() {
+            try {
+                const response = await App.authenticatedFetch('/api/v1/stores');
+                const data = await response.json();
+                const stores = data.stores || [];
+
+                const select = document.getElementById('store-select');
+                select.innerHTML = '';
+
+                if (stores.length === 0) {
+                    select.innerHTML = '<option value="">No stores found</option>';
+                    return;
+                }
+
+                stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.id;
+                    option.textContent = store.name;
+                    select.appendChild(option);
+                });
+
+                // Select first store by default
+                if (stores.length > 0) {
+                    loadReports();
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+            }
+        }
+
+        async function loadReports() {
+            const storeId = document.getElementById('store-select').value;
+            const listDiv = document.getElementById('report-list');
+
+            if (!storeId) return;
+
+            listDiv.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading...</div>';
+
+            try {
+                const response = await App.authenticatedFetch(`/api/v1/stores/${storeId}/reports`);
+                const data = await response.json();
+
+                if (data.reports.length === 0) {
+                    listDiv.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No reports generated yet.</div>';
+                    return;
+                }
+
+                listDiv.innerHTML = '';
+                data.reports.forEach(report => {
+                    const item = document.createElement('div');
+                    item.className = 'report-item';
+                    item.innerHTML = `
+                        <div class="report-info">
+                            <h4>Weekly Analysis</h4>
+                            <div class="report-date">${report.period_start} to ${report.period_end}</div>
+                        </div>
+                        <div>
+                            <button onclick="downloadPDF('${storeId}', '${report.id}')" class="btn" style="border: 1px solid var(--border-color); margin-left: 0.5rem;">
+                                Download PDF
+                            </button>
+                        </div>
+                    `;
+                    listDiv.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error('Error loading reports:', error);
+                listDiv.innerHTML = '<div style="text-align: center; color: var(--danger-color);">Failed to load reports</div>';
+            }
+        }
+
+        async function generateReport() {
+            const storeId = document.getElementById('store-select').value;
+            const btn = document.getElementById('generate-btn');
+            const status = document.getElementById('generate-status');
+
+            if (!storeId) {
+                alert('Please select a store first.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Generating... (This may take a minute)';
+            status.textContent = '';
+
+            try {
+                const response = await App.authenticatedFetch(`/api/v1/stores/${storeId}/reports/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ period_days: 7 })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Generation failed');
+
+                status.textContent = 'Report generated successfully!';
+                status.style.color = 'var(--success-color)';
+
+                // Reload list
+                loadReports();
+
+            } catch (error) {
+                console.error('Generation error:', error);
+                status.textContent = error.message;
+                status.style.color = 'var(--danger-color)';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Report (Last 7 Days)';
+            }
+        }
+
+        async function downloadPDF(storeId, reportId) {
+            try {
+                const response = await App.authenticatedFetch(`/api/v1/stores/${storeId}/reports/${reportId}/pdf`);
+
+                if (!response.ok) throw new Error('Download failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report-${reportId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download PDF');
+            }
+        }
+    </script>
+</body>
+
+</html>

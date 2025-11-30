@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biz Insight AI - AI-Powered Business Analytics</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://biz-insight-ai.com/">
+    <meta property="og:title" content="Biz Insight AI - AI-Powered Business Analytics">
+    <meta property="og:description" content="Transform your sales data into actionable insights with AI-powered analytics. Real-time dashboards, automated reports, and intelligent recommendations.">
+    <meta property="og:image" content="/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://biz-insight-ai.com/">
+    <meta property="twitter:title" content="Biz Insight AI - AI-Powered Business Analytics">
+    <meta property="twitter:description" content="Transform your sales data into actionable insights with AI-powered analytics. Real-time dashboards, automated reports, and intelligent recommendations.">
+    <meta property="twitter:image" content="/og-image.png">
+    
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container" style="max-width: 400px; margin-top: 4rem;">
+        <div class="card">
+            <h1 style="text-align: center; margin-bottom: 2rem; color: var(--primary-color);">Biz Insight AI</h1>
+            
+            <div id="login-form">
+                <h2 style="margin-bottom: 1.5rem;">Login</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="login-email" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="login-password" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                    <div id="login-error" class="error-message"></div>
+                </form>
+                <p style="margin-top: 1rem; text-align: center; font-size: 0.875rem;">
+                    Don't have an account? <a href="#" onclick="toggleForms()" style="color: var(--primary-color);">Sign up</a>
+                </p>
+            </div>
+
+            <div id="signup-form" class="hidden">
+                <h2 style="margin-bottom: 1.5rem;">Sign Up</h2>
+                <form onsubmit="handleSignup(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="signup-email" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="signup-password" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Sign Up</button>
+                    <div id="signup-error" class="error-message"></div>
+                </form>
+                <p style="margin-top: 1rem; text-align: center; font-size: 0.875rem;">
+                    Already have an account? <a href="#" onclick="toggleForms()" style="color: var(--primary-color);">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        function toggleForms() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('signup-form').classList.toggle('hidden');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            try {
+                errorDiv.textContent = '';
+                await App.login(email, password);
+            } catch (error) {
+                errorDiv.textContent = error.message;
+            }
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const errorDiv = document.getElementById('signup-error');
+            
+            try {
+                errorDiv.textContent = '';
+                await App.signup(email, password);
+            } catch (error) {
+                errorDiv.textContent = error.message;
+            }
+        }
+    </script>
+</body>
+</html>

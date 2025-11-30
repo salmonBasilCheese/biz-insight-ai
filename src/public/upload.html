@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Data - Biz Insight AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center;">
+            <h2 style="color: var(--primary-color);">Biz Insight AI</h2>
+            <nav class="nav-links">
+                <a href="/dashboard.html">Dashboard</a>
+                <a href="/upload.html" style="color: var(--primary-color);">Upload Data</a>
+                <a href="/reports.html">Reports</a>
+            </nav>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <span id="user-email" style="margin-right: 1rem; font-size: 0.875rem;"></span>
+            <button onclick="App.logout()" class="btn" style="border: 1px solid var(--border-color);">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3>Upload Sales Data</h3>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">
+                Upload your daily sales CSV file. The file should contain columns for Date, Revenue, and Visitors.
+            </p>
+
+            <div class="form-group">
+                <label class="form-label">Select Store</label>
+                <select id="store-select" class="form-input">
+                    <option value="">Loading stores...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">CSV File</label>
+                <div
+                    style="border: 2px dashed var(--border-color); padding: 2rem; text-align: center; border-radius: 0.5rem;">
+                    <input type="file" id="csv-file" accept=".csv" style="display: none;" onchange="updateFileName()">
+                    <button onclick="document.getElementById('csv-file').click()" class="btn btn-primary">Choose
+                        File</button>
+                    <p id="file-name" style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-muted);">No file
+                        chosen</p>
+                </div>
+            </div>
+
+            <button onclick="handleUpload()" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Upload
+                Data</button>
+            <div id="upload-status" style="margin-top: 1rem; text-align: center;"></div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadStores();
+        });
+
+        async function loadStores() {
+            try {
+                const response = await App.authenticatedFetch('/api/v1/stores');
+                const data = await response.json();
+                const stores = data.stores || [];
+
+                const select = document.getElementById('store-select');
+                select.innerHTML = '';
+
+                if (stores.length === 0) {
+                    // Auto-create a default store
+                    const createResponse = await App.authenticatedFetch('/api/v1/stores', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: 'My First Store',
+                            industry: 'restaurant' // Default industry
+                        })
+                    });
+
+                    if (createResponse.ok) {
+                        const createData = await createResponse.json();
+                        const newStore = createData.store;
+
+                        const option = document.createElement('option');
+                        option.value = newStore.id;
+                        option.textContent = newStore.name;
+                        select.appendChild(option);
+                        return;
+                    } else {
+                        select.innerHTML = '<option value="">Failed to create default store</option>';
+                        return;
+                    }
+                }
+
+                stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.id;
+                    option.textContent = store.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading stores:', error);
+            }
+        }
+
+        function updateFileName() {
+            const fileInput = document.getElementById('csv-file');
+            const fileName = document.getElementById('file-name');
+            if (fileInput.files.length > 0) {
+                fileName.textContent = fileInput.files[0].name;
+            } else {
+                fileName.textContent = 'No file chosen';
+            }
+        }
+
+        async function handleUpload() {
+            const storeId = document.getElementById('store-select').value;
+            const fileInput = document.getElementById('csv-file');
+            const statusDiv = document.getElementById('upload-status');
+
+            if (!storeId) {
+                statusDiv.textContent = 'Please select a store';
+                statusDiv.style.color = 'var(--danger-color)';
+                return;
+            }
+
+            if (fileInput.files.length === 0) {
+                statusDiv.textContent = 'Please select a file';
+                statusDiv.style.color = 'var(--danger-color)';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            statusDiv.textContent = 'Uploading...';
+            statusDiv.style.color = 'var(--text-color)';
+
+            try {
+                const response = await App.authenticatedFetch(`/api/v1/stores/${storeId}/sales/upload`, {
+                    method: 'POST',
+                    headers: {}, // Let browser set Content-Type for FormData
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Upload failed');
+
+                statusDiv.textContent = `Success! ${data.count} records imported.`;
+                statusDiv.style.color = 'var(--success-color)';
+
+                // Clear file input
+                fileInput.value = '';
+                updateFileName();
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                statusDiv.textContent = error.message;
+                statusDiv.style.color = 'var(--danger-color)';
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Biz Insight AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .metric-change {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .change-positive {
+            color: var(--success-color);
+        }
+
+        .change-negative {
+            color: var(--danger-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center;">
+            <h2 style="color: var(--primary-color);">Biz Insight AI</h2>
+            <nav class="nav-links">
+                <a href="/dashboard.html" style="color: var(--primary-color);">Dashboard</a>
+                <a href="/upload.html">Upload Data</a>
+                <a href="/reports.html">Reports</a>
+            </nav>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <span id="user-email" style="margin-right: 1rem; font-size: 0.875rem;"></span>
+            <button onclick="App.logout()" class="btn" style="border: 1px solid var(--border-color);">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3>Store Overview</h3>
+                <select id="store-select" class="form-input" style="width: auto;" onchange="loadDashboard()">
+                    <option value="">Loading stores...</option>
+                </select>
+            </div>
+
+            <div id="dashboard-content" class="hidden">
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Weekly Revenue</div>
+                        <div class="metric-value" id="revenue-value">-</div>
+                        <div class="metric-change" id="revenue-change">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Weekly Visitors</div>
+                        <div class="metric-value" id="visitors-value">-</div>
+                        <div class="metric-change" id="visitors-change">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Avg Customer Value</div>
+                        <div class="metric-value" id="acv-value">-</div>
+                        <div class="metric-change" id="acv-change">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">New Customers</div>
+                        <div class="metric-value" id="new-customers-value">-</div>
+                        <div class="metric-change" id="new-customers-change">-</div>
+                    </div>
+                </div>
+
+                <div
+                    style="text-align: center; padding: 2rem; background: #374151; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">Want deeper insights?</p>
+                    <a href="/reports.html" class="btn btn-primary">Generate AI Report</a>
+                </div>
+            </div>
+
+            <div id="loading" style="text-align: center; padding: 2rem;">
+                Loading dashboard data...
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadStores();
+        });
+
+        async function loadStores() {
+            try {
+                const response = await App.authenticatedFetch('/api/v1/stores');
+                const data = await response.json();
+                const stores = data.stores || [];
+
+                const select = document.getElementById('store-select');
+                select.innerHTML = '';
+
+                if (stores.length === 0) {
+                    select.innerHTML = '<option value="">No stores found</option>';
+                    document.getElementById('loading').innerHTML = `
+                        <p>You don't have any stores yet.</p>
+                        <a href="/create-store.html" class="btn btn-primary" style="margin-top: 1rem;">Create New Store</a>
+                    `;
+                    return;
+                }
+
+                stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.id;
+                    option.textContent = store.name;
+                    select.appendChild(option);
+                });
+
+                // Select first store by default
+                if (stores.length > 0) {
+                    App.state.currentStore = stores[0];
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+            }
+        }
+
+        async function loadDashboard() {
+            const storeId = document.getElementById('store-select').value;
+            if (!storeId) return;
+
+            document.getElementById('dashboard-content').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const response = await App.authenticatedFetch(`/api/v1/stores/${storeId}/dashboard`);
+                const data = await response.json();
+
+                // Update Metrics
+                updateMetric('revenue', data.metrics.revenue.current, data.metrics.revenue.change_percent, '¥');
+                updateMetric('visitors', data.metrics.visitors.current, data.metrics.visitors.change_percent, '', ' people');
+                updateMetric('acv', data.metrics.avg_customer_value.current, data.metrics.avg_customer_value.change_percent, '¥');
+                updateMetric('new-customers', data.metrics.new_customers.current, data.metrics.new_customers.change_percent, '', ' people');
+
+                document.getElementById('dashboard-content').classList.remove('hidden');
+                document.getElementById('loading').classList.add('hidden');
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('loading').textContent = 'Error loading data. Please try again.';
+            }
+        }
+
+        function updateMetric(id, value, change, prefix = '', suffix = '') {
+            document.getElementById(`${id}-value`).textContent = `${prefix}${value.toLocaleString()}${suffix}`;
+
+            const changeEl = document.getElementById(`${id}-change`);
+            const changeVal = parseFloat(change);
+
+            if (changeVal > 0) {
+                changeEl.textContent = `▲ ${changeVal}% vs last week`;
+                changeEl.className = 'metric-change change-positive';
+            } else if (changeVal < 0) {
+                changeEl.textContent = `▼ ${Math.abs(changeVal)}% vs last week`;
+                changeEl.className = 'metric-change change-negative';
+            } else {
+                changeEl.textContent = 'No change';
+                changeEl.className = 'metric-change';
+            }
+        }
+    </script>
+</body>
+
+</html>
